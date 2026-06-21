@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from math import exp
 from time import perf_counter
@@ -8,14 +9,7 @@ from app.core.logging import app_logger
 from app.models import GetMessageRequestModel, GetMessageResponseModel, IncomingMessage, Prediction
 from fastapi import FastAPI
 
-app = FastAPI()
-
 DEFAULT_MODEL_NAME = "hf-internal-testing/tiny-random-distilbert"
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "model_name": get_model_name()}
 
 
 def get_model_name() -> str:
@@ -24,14 +18,25 @@ def get_model_name() -> str:
 
 @lru_cache(maxsize=4)
 def get_classifier(model_name: str):
+    local_files_only = os.getenv("MODEL_LOCAL_FILES_ONLY", "1") != "0"
+    if local_files_only:
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
     try:
-        from transformers import pipeline
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
     except ImportError:
         app_logger.warning("transformers is not installed; using fallback classifier")
         return None
 
     try:
-        return pipeline("text-classification", model=model_name, tokenizer=model_name)
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name, local_files_only=local_files_only
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, local_files_only=local_files_only, use_safetensors=False
+        )
+        return pipeline("text-classification", model=model, tokenizer=tokenizer)
     except Exception as exc:
         app_logger.warning("Could not load MODEL_NAME=%s: %s", model_name, exc)
         return None
@@ -73,6 +78,22 @@ def is_bot_probability(text: str) -> float:
     if probability is not None:
         return probability
     return heuristic_probability(text)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    model_name = get_model_name()
+    app_logger.info("Loading classifier model on startup: %s", model_name)
+    get_classifier(model_name)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "model_name": get_model_name()}
 
 
 @app.post("/get_message", response_model=GetMessageResponseModel)
