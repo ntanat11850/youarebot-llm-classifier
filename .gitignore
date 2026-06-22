@@ -1,5 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+artifacts/
+.hf_home/
+results/
 *.py[cod]
 *$py.class
 

@@ -1,10 +1,32 @@
-# Echo Bot
+# Zero-shot Bot Detector
 
-A simple echo bot for the HumanOrBot project that replies to any received message with the same text.
+A FastAPI service for the HumanOrBot project. Its `/predict` endpoint uses the
+pretrained `typeform/distilbert-base-uncased-mnli` model for zero-shot bot
+classification. The model compares the NLI hypotheses “This speaker is a
+human” and “This speaker is a bot” and returns the normalized bot score.
 
 ## Overview
 
-This service provides a FastAPI-based API endpoint that receives messages and echoes them back. It is designed to work with the HumanOrBot service, responding to each message with the same text.
+The service keeps a short, bounded participant history per dialogue so each
+prediction can use the speaker's messages seen so far. The `/get_message`
+endpoint remains an echo response for the chat exercise.
+
+On first startup, Transformers downloads the pretrained model from Hugging
+Face. To use an existing local copy, set `MODEL_PATH`; to prohibit network
+access, also set `MODEL_LOCAL_FILES_ONLY=1`.
+
+## Local evaluation
+
+The supplied `ytest.csv` contains IDs, not labels. Evaluation therefore uses a
+stable 25% dialog-level holdout from the labelled training set:
+
+```bash
+.venv/bin/python scripts/evaluate_zero_shot.py \
+  --data-dir /path/to/you-are-bot-2
+```
+
+Metrics are written to `results/zero_shot_metrics.json`, and full test
+predictions to `results/zero_shot_submission.csv`.
 
 ## Running the Service
 
