@@ -9,7 +9,8 @@ human” and “This speaker is a bot” and returns the normalized bot score.
 
 The service keeps a short, bounded participant history per dialogue so each
 prediction can use the speaker's messages seen so far. The `/get_message`
-endpoint remains an echo response for the chat exercise.
+endpoint sends the latest user message to the local LLM service and returns the
+generated reply.
 
 On first startup, Transformers downloads the pretrained model from Hugging
 Face. To use an existing local copy, set `MODEL_PATH`; to prohibit network
@@ -29,6 +30,36 @@ Metrics are written to `results/zero_shot_metrics.json`, and full test
 predictions to `results/zero_shot_submission.csv`.
 
 ## Running the Service
+
+## Docker Compose LLM Bot
+
+The compose setup runs three services:
+
+1. `llm` - llama.cpp server with a GGUF chat model
+2. `fastapi` - backend API on port `6872`
+3. `streamlit` - chat UI on port `8502`
+
+This workspace is configured to use `models/qwen-model.gguf`.
+
+```bash
+docker compose up --build
+```
+
+Then open:
+
+```text
+http://localhost:8502
+```
+
+The FastAPI endpoint can be checked directly:
+
+```bash
+curl -X POST http://127.0.0.1:6872/get_message \
+  -H 'Content-Type: application/json' \
+  -d '{"dialog_id":"11111111-1111-4111-8111-111111111111","last_msg_text":"Say hello in one short sentence.","last_message_id":"22222222-2222-4222-8222-222222222222"}'
+```
+
+Expected result: `new_msg_text` contains an LLM-generated answer.
 
 Go to the project directory:
 

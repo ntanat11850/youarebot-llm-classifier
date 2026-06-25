@@ -1,0 +1,54 @@
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command:
+      - -m
+      - /models/qwen-model.gguf
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - -c
+      - "2048"
+      - -n
+      - "256"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/models:ro
+
+  fastapi:
+    build: .
+    command:
+      - fastapi
+      - run
+      - app/api/main.py
+      - --host
+      - 0.0.0.0
+      - --port
+      - "6872"
+    environment:
+      LLM_BASE_URL: http://llm:8080
+      MODEL_LOCAL_FILES_ONLY: "1"
+      MODEL_PATH: /app/artifacts/typeform-distilbert-base-uncased-mnli
+    ports:
+      - "6872:6872"
+    depends_on:
+      - llm
+
+  streamlit:
+    build: .
+    command:
+      - streamlit
+      - run
+      - app/web/streamlit_app.py
+      - --server.address
+      - 0.0.0.0
+      - --server.port
+      - "8501"
+    environment:
+      FASTAPI_URL: http://fastapi:6872
+    ports:
+      - "8502:8501"
+    depends_on:
+      - fastapi

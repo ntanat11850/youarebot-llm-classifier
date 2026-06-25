@@ -175,3 +175,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Local Docker/LLM runtime files
+.DS_Store
+models/*.gguf

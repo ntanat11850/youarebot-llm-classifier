@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from uuid import uuid4
@@ -9,11 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.models import GetMessageRequestModel
 
-default_echo_bot_url = "http://localhost:6872"
+default_echo_bot_url = os.getenv("FASTAPI_URL", "http://localhost:6872")
 st.set_page_config(initial_sidebar_state="collapsed")
 
-st.markdown("# Echo classifier")
-st.sidebar.markdown("# Echo classifier")
+st.markdown("# LLM bot classifier")
+st.sidebar.markdown("# LLM bot classifier")
 
 if "dialog_id" not in st.session_state:
     st.session_state.dialog_id = str(uuid4())
@@ -86,7 +87,7 @@ with st.sidebar:
         reset_chat()
 
     echo_bot_url = st.text_input(
-        "Bot url", key="echo_bot_url", value=default_echo_bot_url, disabled=True
+        "Bot URL", key="echo_bot_url", value=default_echo_bot_url, disabled=True
     )
 
     dialog_id = st.text_input("Dialog id", key="dialog_id", disabled=True)
@@ -130,7 +131,7 @@ if message := st.chat_input():
         )
         response.raise_for_status()
     except requests.RequestException as exc:
-        st.error(f"Could not get echoed message: {exc}")
+        st.error(f"Could not get bot message: {exc}")
         st.rerun()
 
     json_response = response.json()
@@ -143,7 +144,7 @@ if message := st.chat_input():
             echo_bot_url, response, assistant_message_id, 1
         )
     except requests.RequestException as exc:
-        st.error(f"Could not classify echoed message: {exc}")
+        st.error(f"Could not classify bot message: {exc}")
 
     if user_probability is not None and assistant_probability is not None:
         st.session_state.turns.append(

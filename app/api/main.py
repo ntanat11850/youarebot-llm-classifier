@@ -4,9 +4,10 @@ from time import perf_counter
 from uuid import uuid4
 
 from app.core.logging import app_logger
+from app.llm_client import LLMClientError, generate_reply
 from app.model_inference import DialogHistory, ZeroShotBotDetector
 from app.models import GetMessageRequestModel, GetMessageResponseModel, IncomingMessage, Prediction
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 @lru_cache(maxsize=1)
 def get_detector() -> ZeroShotBotDetector:
@@ -50,9 +51,13 @@ async def get_message(body: GetMessageRequestModel):
     app_logger.info(
         f"Received message dialog_id: {body.dialog_id}, last_msg_id: {body.last_message_id}"
     )
-    return GetMessageResponseModel(
-        new_msg_text=body.last_msg_text, dialog_id=body.dialog_id
-    )
+    try:
+        reply = await generate_reply(body.last_msg_text)
+    except LLMClientError as exc:
+        app_logger.exception("Failed to generate LLM reply")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return GetMessageResponseModel(new_msg_text=reply, dialog_id=body.dialog_id)
 
 @app.post("/predict", response_model=Prediction)
 def predict(msg: IncomingMessage) -> Prediction:
