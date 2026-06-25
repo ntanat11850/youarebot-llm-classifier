@@ -1,0 +1,29 @@
+{
+  "model_name": "champion-keyword-bot-classifier",
+  "version": "2026-06-25-session-12",
+  "source": "MLflow artifact volume mounted from ./mlflow/artifacts",
+  "base_probability": 0.45,
+  "marker_weight": 0.08,
+  "bot_markers": [
+    "as an ai",
+    "language model",
+    "i cannot",
+    "i do not have",
+    "here are",
+    "certainly",
+    "step-by-step",
+    "in summary",
+    "i'm an ai"
+  ],
+  "human_markers": [
+    "lol",
+    "haha",
+    "i think",
+    "maybe",
+    "honestly",
+    "idk",
+    "tbh",
+    "sounds good",
+    "see you"
+  ]
+}

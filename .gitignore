@@ -1,6 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 artifacts/
+!mlflow/artifacts/
+!mlflow/artifacts/**
 .hf_home/
 results/
 *.py[cod]
@@ -179,3 +181,5 @@ cython_debug/
 # Local Docker/LLM runtime files
 .DS_Store
 models/*.gguf
+mlflow/mlruns/
+mlflow-lora-homework/
