@@ -8,8 +8,8 @@ from threading import Lock
 from time import perf_counter
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI
-from pydantic import BaseModel, UUID4, StrictStr
+from fastapi import FastAPI, Response
+from pydantic import BaseModel, Field, UUID4, StrictStr
 
 
 DEFAULT_MODEL_PATH = "/mlflow-artifacts/champion_classifier.json"
@@ -28,6 +28,18 @@ class Prediction(BaseModel):
     dialog_id: UUID4
     participant_index: int
     is_bot_probability: float
+
+
+class ScoreRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=5_000)
+
+
+class ScoreResponse(BaseModel):
+    label: str
+    proba: float = Field(ge=0.0, le=1.0)
+    is_bot_probability: float = Field(ge=0.0, le=1.0)
+    model_name: str
+    model_version: str
 
 
 class DialogHistory:
@@ -87,6 +99,27 @@ def health() -> dict[str, str]:
     }
 
 
+@app.get("/ready")
+def ready() -> dict[str, str]:
+    return {
+        "status": "ready",
+        "model_name": classifier.model_name,
+        "model_version": classifier.version,
+    }
+
+
+@app.post("/score", response_model=ScoreResponse)
+def score(request: ScoreRequest) -> ScoreResponse:
+    probability = classifier.predict(request.text)
+    return ScoreResponse(
+        label="bot" if probability >= 0.5 else "human",
+        proba=probability,
+        is_bot_probability=probability,
+        model_name=classifier.model_name,
+        model_version=classifier.version,
+    )
+
+
 @app.post("/predict", response_model=Prediction)
 def predict(msg: IncomingMessage) -> Prediction:
     started_at = perf_counter()
@@ -110,3 +143,8 @@ def predict(msg: IncomingMessage) -> Prediction:
         participant_index=msg.participant_index,
         is_bot_probability=probability,
     )
+
+
+@app.get("/metrics")
+def metrics() -> Response:
+    return Response("# classifier metrics are not enabled in this lightweight build\n", media_type="text/plain")

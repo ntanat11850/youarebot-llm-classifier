@@ -7,3 +7,9 @@ results
 models/*.gguf
 mlflow/mlruns
 mlflow-lora-homework
+fly.generated.toml
+docker-compose.fly.yml
+postgres-data
+.venv
+.hf_home
+results

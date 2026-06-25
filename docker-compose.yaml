@@ -1,58 +1,42 @@
 services:
-  mlflow:
-    image: python:3.12-slim
-    command:
-      - /bin/sh
-      - -c
-      - |
-        pip install --no-cache-dir "mlflow>=2.14,<3.0" &&
-        mlflow server \
-          --backend-store-uri file:/mlflow/mlruns \
-          --default-artifact-root /mlflow/artifacts \
-          --host 0.0.0.0 \
-          --port 5000
+  postgres:
+    image: postgres:16-alpine
     ports:
-      - "5001:5000"
-    volumes:
-      - ./mlflow:/mlflow
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   classifier:
     build:
       context: ./services/classifier
-    environment:
-      CHAMPION_MODEL_PATH: /mlflow-artifacts/champion_classifier.json
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-    volumes:
-      - ./mlflow/artifacts:/mlflow-artifacts:ro
-    depends_on:
-      - mlflow
-
-  llm:
-    build:
-      context: ./services/llm
-    command:
-      - -m
-      - /models/qwen-model.gguf
-      - --host
-      - 0.0.0.0
-      - --port
-      - "11434"
-      - -c
-      - "2048"
-      - -n
-      - "256"
     ports:
-      - "11434:11434"
+      - "8014:8001"
+    environment:
+      APP_PORT: "8001"
+      MODEL_NAME: champion-keyword-bot-classifier
+      MODEL_VERSION: local-session-13
 
   orchestrator:
     build:
       context: ./services/orchestrator
-    environment:
-      CLASSIFIER_URL: http://classifier:8000
-      LLM_BASE_URL: http://llm:11434
-      LLM_MODEL: qwen2.5-0.5b-instruct
+    depends_on:
+      classifier:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     ports:
       - "6872:8000"
-    depends_on:
-      - classifier
-      - llm
+    environment:
+      APP_PORT: "8000"
+      CLASSIFIER_URL: http://classifier:8001
+      DATABASE_URL: postgresql://app:app@postgres:5432/app
+      REQUEST_TIMEOUT_SECONDS: "2.0"
+      DB_CONNECT_RETRIES: "30"
+      DB_CONNECT_SLEEP_SECONDS: "1.0"

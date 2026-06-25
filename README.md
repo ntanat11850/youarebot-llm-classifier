@@ -1,112 +1,108 @@
-# YouAreBot Microservice Architecture
+# YouAreBot Fly.io Microservices
 
-This repository is the quick-start bot refactored into a small local
-microservice architecture.
+This repository contains a small production-style ML microservice system for the
+Session 13 Fly.io deployment homework.
 
 ## Services
 
-`docker-compose.yaml` starts four services:
+`docker-compose.yaml` starts three local services:
 
-1. `mlflow` - MLflow tracking server and artifact store.
-2. `classifier` - internal FastAPI service for `POST /predict`.
-3. `llm` - internal OpenAI-compatible llama.cpp service for
-   `POST /v1/chat/completions`.
-4. `orchestrator` - public FastAPI gateway.
+1. `orchestrator` - public FastAPI API exposing `POST /predict`.
+2. `classifier` - internal FastAPI classifier service exposing `POST /score`.
+3. `postgres` - database for prediction requests and results.
 
-The orchestrator is the only public API for the homework. It does not load or
-run any model. It only forwards requests:
+The public API accepts user text, calls the classifier service, stores the
+prediction result in Postgres, and returns the prediction.
 
-```text
-POST /predict     -> http://classifier:8000/predict
-POST /get_message -> http://llm:11434/v1/chat/completions
-```
-
-Inside Docker Compose, services communicate by service name, not by
-`localhost`.
-
-## Architecture
-
-```text
-client
-  |
-  v
-orchestrator:8000
-  |---- POST /predict ----> classifier:8000
-  |                            |
-  |                            v
-  |                         MLflow artifact volume
-  |
-  |---- POST /get_message -> llm:11434
-                               |
-                               v
-                         llama.cpp chat completions
-```
-
-## MLflow Artifact
-
-The classifier loads its champion artifact from:
-
-```text
-mlflow/artifacts/champion_classifier.json
-```
-
-The MLflow service serves the tracking UI on:
-
-```text
-http://127.0.0.1:5001
-```
-
-For this architecture homework, the classifier artifact is intentionally small
-so the full project remains easy to clone and run locally.
-
-## Run
+## Local Run
 
 ```bash
 docker compose up --build
 ```
 
-The first build downloads a small Qwen GGUF model into the LLM image. This can
-take a few minutes.
-
-Public orchestrator URL:
+Public API:
 
 ```text
 http://127.0.0.1:6872
 ```
 
-## Test `/predict`
+Test readiness and prediction:
+
+```bash
+./scripts/03_test.sh http://127.0.0.1:6872
+```
+
+Manual test:
 
 ```bash
 curl -X POST http://127.0.0.1:6872/predict \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "text": "As an AI language model, here are the steps.",
-    "dialog_id": "11111111-1111-4111-8111-111111111111",
-    "id": "22222222-2222-4222-8222-222222222222",
-    "participant_index": 1
-  }'
+  -H "Content-Type: application/json" \
+  -d '{"text":"Hello"}'
 ```
 
-Expected: JSON with `is_bot_probability` in the range `[0, 1]`.
-
-## Test `/get_message`
+Recent stored predictions:
 
 ```bash
-curl -X POST http://127.0.0.1:6872/get_message \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "dialog_id": "11111111-1111-4111-8111-111111111111",
-    "last_msg_text": "Say hello in one short sentence.",
-    "last_message_id": "33333333-3333-4333-8333-333333333333"
-  }'
+curl http://127.0.0.1:6872/predictions/recent
 ```
 
-Expected: JSON with `new_msg_text` containing an LLM-generated answer.
+## Fly.io Deployment
 
-## Notes
+The deployment follows the `fly_compose_microservices/` pattern from the lecture
+repository. Fly runs one public app with three containers in the same Machine:
 
-- No secrets, tokens, or API keys are required.
-- The public gateway is `orchestrator`; the classifier and LLM are internal
-  services.
-- The LLM service uses internal port `11434`.
-- Local MLflow run history under `mlflow/mlruns/` is ignored.
+```text
+client -> https://<compose-app>.fly.dev/predict
+       -> orchestrator container :8000
+       -> classifier sidecar on localhost:8001
+       -> postgres sidecar on localhost:5432
+```
+
+Set the app names assigned by the instructor:
+
+```bash
+export FLY_ORG=harbour-ml-solution-course
+export FLY_REGION=fra
+export COMPOSE_APP=<your-compose-app>
+export IMAGES_APP=<your-images-app>
+```
+
+Build and push the classifier sidecar image:
+
+```bash
+./scripts/01_build_push_images.sh
+```
+
+Deploy the public Fly app:
+
+```bash
+./scripts/02_deploy_fly.sh
+```
+
+Test the deployed endpoint:
+
+```bash
+./scripts/03_test.sh https://$COMPOSE_APP.fly.dev
+```
+
+The public URL to register on youare.bot is:
+
+```text
+https://<your-compose-app>.fly.dev
+```
+
+## Generated Files
+
+The deploy script generates these local files:
+
+```text
+fly.generated.toml
+docker-compose.fly.yml
+```
+
+They contain personal Fly app names and are intentionally ignored by Git.
+
+## Secrets
+
+No API keys, tokens, or passwords for external accounts are committed. The local
+demo Postgres password is only for the disposable containerized homework setup.

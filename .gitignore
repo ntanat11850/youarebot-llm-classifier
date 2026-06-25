@@ -183,3 +183,6 @@ cython_debug/
 models/*.gguf
 mlflow/mlruns/
 mlflow-lora-homework/
+fly.generated.toml
+docker-compose.fly.yml
+postgres-data/
